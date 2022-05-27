@@ -1,2 +1,2 @@
 # dli_migration
-Python import of DLI Training presentations and metadata
+Python import of DLI Training to DLI-IDD dataverse
