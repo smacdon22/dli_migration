@@ -3,7 +3,7 @@ import csv
 import requests
 
 # change this to your API token
-apitoken = ""
+apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
 requestURL = "https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/datasets"
 # list of persistenIds to publish datasets after uploading
@@ -14,30 +14,35 @@ true = bool(1)
 
 
 # gets the common info that all imports should have
-# title, production date, description, language, production place, subject (Social Sciences)
-def getTDDLKPS(p):
+# title, date, description, language, production place, subject (Social Sciences)
+def getTDDLKSS(p):
     # title
     title_metadata = {"typeName": "title", "multiple": false,
                       "value": p[1].replace("\xa0", " "), "typeClass": "primitive"}
     # date
-    production_date_metadata = {"typeName": "productionDate", "multiple": false, "value": p[13].replace("\xa0", " "),
-                                "typeClass": "primitive"}
+    publication_date_metadata = {"typeName": "distributionDate", "multiple": false, "value": p[13].replace("\xa0", " "),
+                                 "typeClass": "primitive"}
     # description
-    description_value = {"value": p[14].replace("\xa0", " "), "multiple": false, "typeClass": "primitive",
-                         "typeName": "dsDescriptionValue"}
     description_metadata = {"typeName": "dsDescription", "multiple": true,
-                            "value": [{"dsDescriptionValue": description_value}], "typeClass": "compound"}
+                            "value": [
+                                {
+                                    "dsDescriptionValue": {
+                                        "value": p[14].replace("\xa0", " "), "multiple": false,
+                                        "typeClass": "primitive", "typeName": "dsDescriptionValue"
+                                    }
+                                },
+                            ], "typeClass": "compound"}
     # language
     language_metadata = {"typeName": "language", "multiple": true, "typeClass": "controlledVocabulary",
                          "value": [p[25].replace("\xa0", " ")]}
-    # place
-    production_place_metadata = {"typeName": "productionPlace", "multiple": false, "typeClass": "primitive",
-                                 "value": p[3].replace("\xa0", " ")}
+    # series
+    series_metadata = {"typeName": "series", "multiple": false, "typeClass": "compound", "value": {
+        "seriesName": {"typeName": "seriesName", "multiple": false, "typeClass": "primitive",
+                       "value": p[3].replace("\xa0", " ")}}}
     # subject
     subject_metadata = {"typeName": "subject", "multiple": true, "value": ["Social Sciences"],
                         "typeClass": "controlledVocabulary"}
-    return title_metadata, production_date_metadata, description_metadata, \
-           language_metadata, production_place_metadata, subject_metadata
+    return title_metadata, publication_date_metadata, description_metadata, language_metadata, series_metadata, subject_metadata
 
 
 # gets author(s)
@@ -87,26 +92,50 @@ def getAuthor(p):
                                 "value": "ORCID"}
             author_id = {"typeName": "authorIdentifier", "multiple": false, "value": p[6].replace("\xa0", " "),
                          "typeClass": "primitive"}
-            authors_metadata = {"authorAffiliation": author_affiliation, "authorName": author_name,
-                                "authorIdentifierScheme": author_id_scheme, "authorIdentifier": author_id}
+            authors_metadata = [{"authorAffiliation": author_affiliation, "authorName": author_name,
+                                 "authorIdentifierScheme": author_id_scheme, "authorIdentifier": author_id}]
         else:
-            authors_metadata = {"authorAffiliation": author_affiliation, "authorName": author_name}
+            authors_metadata = [{"authorAffiliation": author_affiliation, "authorName": author_name}]
     # return author metadata
-    author_metadata = {"typeName": "author", "multiple": true, "value": [authors_metadata], "typeClass": "compound"}
+    author_metadata = {"typeName": "author", "multiple": true, "value": authors_metadata, "typeClass": "compound"}
     return author_metadata
 
 
 # returns contact info
 # could be authors, or DLI
-def getContact(p):
-    contact_email = {"typeClass": "primitive", "multiple": false, "typeName": "datasetContactEmail",
-                     "value": "mvail@stfx.ca"}
-    contact_name = {"typeClass": "primitive", "multiple": false, "typeName": "datasetContactName", "value": p[4]}
-    # returns dataset contact name and email
-    contact_metadata = {"value": [{"datasetContactEmail": contact_email, "datasetContactName": contact_name}],
-                        "typeClass": "compound", "multiple": true,
-                        "typeName": "datasetContact"}
+def getContact():
+    contact_metadata = {
+        "value": [
+            {
+                "datasetContactEmail": {"typeClass": "primitive", "multiple": false,
+                                        "typeName": "datasetContactEmail",
+                                        "value": "statcan.maddli-damidd.statcan@statcan.gc.ca"},
+                "datasetContactName": {"typeClass": "primitive", "multiple": false,
+                                       "typeName": "datasetContactName",
+                                       "value": "Professional Development Committee."},
+                "datasetContactAffiliation": {"typeClass": "primitive", "multiple": false,
+                                              "typeName": "datasetContactAffiliation",
+                                              "value": "Statistics Canada. Data Liberation Initiative (DLI)"}
+            }
+        ],
+        "typeClass": "compound", "multiple": true,
+        "typeName": "datasetContact"
+    }
     return contact_metadata
+
+
+# gets copyright license
+def getLicense(p):
+    # checks if Statistics Canada content or not
+    if p[5].replace("\xa0", " ") == "Statistics Canada" or p[4].replace("\xa0", " ") == "Statistics Canada":
+        # either their open license
+        license_metadata = {"name": "Statistics Candada Open License",
+                            "uri": "https://www.statcan.gc.ca/en/reference/licence"}
+    else:
+        # or CC BY 4.0
+        license_metadata = {"name": "CC BY 4.0", "uri": "http://creativecommons.org/licenses/by/4.0",
+                            "iconURL": "https://licensebuttons.net/l/by/4.0/88x31.png"}
+    return license_metadata
 
 
 # adds subjects 1-8 as keywords
@@ -121,12 +150,12 @@ def getKeyword(p):
             keywords_metadata.append(
                 {"keywordValue": {"typeName": "keywordValue", "multiple": false, "typeClass": "primitive",
                                   "value": i.replace("\xa0", " ")}})
-    # returns keywords_metadataeywords
+    # returns keywords
     keyword_metadata = {"typeName": "keyword", "multiple": true, "typeClass": "compound", "value": keywords_metadata}
     return keyword_metadata
 
 
-# main<3
+# main
 if __name__ == '__main__':
     # open and read test .csv
     dli_info = open("ingest-test.csv", "r")
@@ -137,13 +166,12 @@ if __name__ == '__main__':
     prev_ids = []
     # this is all the metadata .json files
     datasets_metadata = []
-    c = 0
-    for i in reader:
+    for file_line in reader:
         # retrieves the end of the identifier
         # starts after private://dli_training/
         # 23 characters
-        dataset_id = i[31][23:27]
-        if i[0] == "UID":
+        dataset_id = file_line[31][23:27]
+        if file_line[0] == "UID":
             pass
         # would normally add file info here
         # but not needed for just metadata upload
@@ -151,46 +179,37 @@ if __name__ == '__main__':
             pass
         else:
             # .json skeleton
-            blank_json = {"datasetVersion":
-                {
-                    "license": {
-                        "name": "CC0 1.0",
-                        "uri": "http://creativecommons.org/publicdomain/zero/1.0"
-                    },
-                    "metadataBlocks":
-                        {"citation":
-                             {"fields":
-                                  [],
-                              "displayName": "Citation Metadata"
-                              }
-                         }
+            blank_json = {
+                "datasetVersion": {
+                    "license":
+                        getLicense(file_line),
+                    "metadataBlocks": {
+                        "citation": {
+                            "fields": [
+                                ],
+                            "displayName": "Citation Metadata"
+                            }
+                        }
+                    }
                 }
-            }
             # gets all the citation info
-            title_md, date_md, desc_md, language_md, place_md, subject_md = getTDDLKPS(i)
-            author_md = getAuthor(i)
-            contact_md = getContact(i)
-            keyword_md = getKeyword(i)
+            title_md, date_md, desc_md, language_md, series_md, subject_md = getTDDLKSS(file_line)
+            author_md = getAuthor(file_line)
+            contact_md = getContact()
+            keyword_md = getKeyword(file_line)
             # appends id to list
             prev_ids.append(dataset_id)
             # sets citation fields
             # required: title, description, subject, author, contact
             blank_json["datasetVersion"]["metadataBlocks"]["citation"]["fields"] = [title_md, date_md, desc_md,
                                                                                     subject_md, author_md, language_md,
-                                                                                    place_md, contact_md, keyword_md]
+                                                                                    contact_md, keyword_md, series_md]
             # add to list of all metadata
             datasets_metadata.append(blank_json)
     # for each metadata string (in json format)
-    for i in datasets_metadata:
-        # makes file
-        # not needed if straight uploading
-        # comment out file code below to, skip that stuff if you want
-        # outfile = open("dli_migration_" + prev_ids[c] + ".json", "w")
-        # json.dump(i, outfile, indent=4)
-        # outfile.close()
-        json.dumps(i)
-        apiJSON = i
+    for r in datasets_metadata:
+        json.dumps(r)
+        apiJSON = r
         # upload dataset as draft
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
         PIDs.append(response.json()["data"]["persistentId"])
-        c += 1
