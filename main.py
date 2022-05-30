@@ -3,7 +3,7 @@ import csv
 import requests
 
 # change this to your API token
-apitoken = "675907dd-4fa3-414c-a1fc-1f9966ddca6e"
+apitoken = ""
 apiHeader = {"X-Dataverse-key": apitoken}
 requestURL = "https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/datasets"
 # list of persistenIds to publish datasets after uploading
