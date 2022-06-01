@@ -1,12 +1,17 @@
 import json
 import csv
+import wget
+import os
 import requests
+from sword2 import Connection
 
 # change this to your API token
 apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
+con = Connection("https://demodv.scholarsportal.info/dvn/api/", user_name=apitoken)
 requestURL = "https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/datasets"
-# list of persistenIds to publish datasets after uploading
+fileURL = "https://demodv.scholarsportal.info/dvn/api/data-deposit/v1.1/swordv2/edit-media/study/"
+# list of persistentIds to publish datasets after uploading
 PIDs = []
 
 false = bool(0)
@@ -158,58 +163,82 @@ def getKeyword(p):
 # main
 if __name__ == '__main__':
     # open and read test .csv
-    dli_info = open("ingest-test.csv", "r")
-    reader = csv.reader(dli_info)
-    # this is the already seen IDs
-    # there may be multiple datasets with the same ID
-    # as multiple files can be attributed to the same dataset
-    prev_ids = []
-    # this is all the metadata .json files
-    datasets_metadata = []
-    for file_line in reader:
-        # retrieves the end of the identifier
-        # starts after private://dli_training/
-        # 23 characters
-        dataset_id = file_line[31][23:27]
-        if file_line[0] == "UID":
-            pass
-        # would normally add file info here
-        # but not needed for just metadata upload
-        elif prev_ids.count(dataset_id) > 0:
-            pass
-        else:
-            # .json skeleton
-            blank_json = {
-                "datasetVersion": {
-                    "license":
-                        getLicense(file_line),
-                    "metadataBlocks": {
-                        "citation": {
-                            "fields": [
+    with open("ingest-test.csv", "r") as dli_info:
+        reader = csv.reader(dli_info)
+        # this is the already seen IDs
+        # there may be multiple datasets with the same ID
+        # as multiple files can be attributed to the same dataset
+        prev_ids = []
+        # this is all the metadata .json files
+        datasets_metadata = []
+        c = 0
+        for file_line in reader:
+            # retrieves the end of the identifier
+            # starts after private://dli_training/
+            # 23 characters
+            dataset_id = file_line[31][23:27]
+            if file_line[0] == "UID":
+                pass
+            # would normally add file info here
+            # but not needed for just metadata upload
+            elif prev_ids.count(dataset_id) > 0:
+                d = prev_ids.index(file_line[31][23:27])
+                datasets_metadata[d][1].append(file_line[29])
+            else:
+                # .json skeleton
+                blank_json = {
+                    "datasetVersion": {
+                        "license":
+                            getLicense(file_line),
+                        "metadataBlocks": {
+                            "citation": {
+                                "fields": [
                                 ],
-                            "displayName": "Citation Metadata"
+                                "displayName": "Citation Metadata"
                             }
                         }
                     }
                 }
-            # gets all the citation info
-            title_md, date_md, desc_md, language_md, series_md, subject_md = getTDDLKSS(file_line)
-            author_md = getAuthor(file_line)
-            contact_md = getContact()
-            keyword_md = getKeyword(file_line)
-            # appends id to list
-            prev_ids.append(dataset_id)
-            # sets citation fields
-            # required: title, description, subject, author, contact
-            blank_json["datasetVersion"]["metadataBlocks"]["citation"]["fields"] = [title_md, date_md, desc_md,
-                                                                                    subject_md, author_md, language_md,
-                                                                                    contact_md, keyword_md, series_md]
-            # add to list of all metadata
-            datasets_metadata.append(blank_json)
+                # gets all the citation info
+                title_md, date_md, desc_md, language_md, series_md, subject_md = getTDDLKSS(file_line)
+                author_md = getAuthor(file_line)
+                contact_md = getContact()
+                keyword_md = getKeyword(file_line)
+                fs = file_line[29]
+                # appends id to list
+                prev_ids.append(dataset_id)
+                # sets citation fields
+                # required: title, description, subject, author, contact
+                blank_json["datasetVersion"]["metadataBlocks"]["citation"]["fields"] = [title_md, date_md, desc_md,
+                                                                                        subject_md, author_md, language_md,
+                                                                                        contact_md, keyword_md, series_md]
+                # add to list of all metadata
+                datasets_metadata.append([blank_json, [fs]])
+                c += 1
     # for each metadata string (in json format)
+    c = 0
     for r in datasets_metadata:
-        json.dumps(r)
-        apiJSON = r
+        # makes file
+        # not needed if straight uploading
+        # outfile = open("dli_migration_" + prev_ids[c] + ".json", "w")
+        # json.dump(r, outfile, indent=4)
+        # outfile.close()
+        json.dumps(r[0])
+        apiJSON = r[0]
         # upload dataset as draft
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
-        PIDs.append(response.json()["data"]["persistentId"])
+        # get persistent id
+        ppp = response.json()["data"]["persistentId"]
+        for i in r[1]:
+            with open(os.getcwd() + "files/" + prev_ids[c] + "/" + i, "rb") as data:
+                # add file to record
+                receipt = con.add_file_to_resource(
+                    edit_media_iri= fileURL + ppp,
+                    payload=data,
+                    mimetype="application/zip",
+                    filename=i,
+                    packaging="http://purl.org/net/sword/package/SimpleZip")
+        # publish record
+        pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="+ppp+"&type=major"
+        pResponse = requests.post(pubURL, headers=apiHeader)
+        c += 1
