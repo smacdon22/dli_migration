@@ -25,7 +25,7 @@ def getTDDLKSS(p):
     title_metadata = {"typeName": "title", "multiple": false,
                       "value": p[1].replace("\xa0", " "), "typeClass": "primitive"}
     # date
-    publication_date_metadata = {"typeName": "distributionDate", "multiple": false, "value": p[13].replace("\xa0", " "),
+    publication_date_metadata = {"typeName": "publicationDate", "multiple": false, "value": p[13].replace("\xa0", " "),
                                  "typeClass": "primitive"}
     # description
     description_metadata = {"typeName": "dsDescription", "multiple": true,
@@ -160,6 +160,36 @@ def getKeyword(p):
     return keyword_metadata
 
 
+def getMimeType(p):
+    if p == "pdf":
+        return "application/pdf"
+    elif p == "doc":
+        return "application/msword"
+    elif p == "docx":
+        return "application/vnd.openxmlformatsofficedocument.wordprocessingml.document"
+    elif p == "ppt":
+        return "application/vnd.ms-powerpoint"
+    elif p == "pptx":
+        return "application/vnd.openxmlformatsofficedocument.presentationml.presentation"
+    elif p == "jpg" or p == "jpeg":
+        return "image/jpeg"
+    elif p == "png":
+        return "image/png"
+    elif p == "mp3":
+        return "audio/mpeg"
+    elif p == "mp4":
+        return "video/mp4"
+    else:
+        return "text/plain"
+
+
+def getFile(p):
+    fName = p[29]
+    fInfo = {"filename": p[29], "description": p[1]+" "+(p[28].upper()), "categories": [p[2]], "restrict": false,
+         "mimeType": getMimeType(p[28])}
+    return [fName, fInfo]
+
+
 # main
 if __name__ == '__main__':
     # open and read test .csv
@@ -183,7 +213,7 @@ if __name__ == '__main__':
             # but not needed for just metadata upload
             elif prev_ids.count(dataset_id) > 0:
                 d = prev_ids.index(file_line[31][23:27])
-                datasets_metadata[d][1].append(file_line[29])
+                datasets_metadata[d][1].append(getFile(file_line))
             else:
                 # .json skeleton
                 blank_json = {
@@ -204,7 +234,7 @@ if __name__ == '__main__':
                 author_md = getAuthor(file_line)
                 contact_md = getContact()
                 keyword_md = getKeyword(file_line)
-                fs = file_line[29]
+                fs = getFile(file_line)
                 # appends id to list
                 prev_ids.append(dataset_id)
                 # sets citation fields
@@ -214,31 +244,36 @@ if __name__ == '__main__':
                                                                                         contact_md, keyword_md, series_md]
                 # add to list of all metadata
                 datasets_metadata.append([blank_json, [fs]])
+
                 c += 1
     # for each metadata string (in json format)
     c = 0
     for r in datasets_metadata:
-        # makes file
-        # not needed if straight uploading
-        # outfile = open("dli_migration_" + prev_ids[c] + ".json", "w")
-        # json.dump(r, outfile, indent=4)
-        # outfile.close()
         json.dumps(r[0])
         apiJSON = r[0]
         # upload dataset as draft
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
-        # get persistent id
         ppp = response.json()["data"]["persistentId"]
         for i in r[1]:
-            with open(os.getcwd() + "files/" + prev_ids[c] + "/" + i, "rb") as data:
-                # add file to record
+            with open(os.getcwd() + "/files/" + prev_ids[c] + "/" + i[0], "rb") as data:
                 receipt = con.add_file_to_resource(
                     edit_media_iri= fileURL + ppp,
                     payload=data,
                     mimetype="application/zip",
-                    filename=i,
+                    filename=i[0],
                     packaging="http://purl.org/net/sword/package/SimpleZip")
-        # publish record
+        mdURL = "https://demodv.scholarsportal.info/api/datasets/" + str(response.json()["data"]["id"]) + "/versions/:draft/files"
+        res = requests.get(mdURL, headers=apiHeader)
+        if res.json()["status"] != "ERROR":
+            m = 0
+            for v in res.json()["data"]:
+                nURL = "https://demodv.scholarsportal.info/api/files/" + str(v["dataFile"]["id"]) + "/metadata"
+                files = {'jsonData': (None, str(json.dumps(r[1][m][1]))),}
+                rres = requests.post(nURL, headers=apiHeader, files=files)
+                m += 1
+                print(files)
+                print(rres.text)
+
         pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="+ppp+"&type=major"
         pResponse = requests.post(pubURL, headers=apiHeader)
         c += 1
