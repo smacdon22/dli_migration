@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 m += 1
                 print(files)
                 print(rres.text)
-
+        # publish the dataset
         pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="+ppp+"&type=major"
         pResponse = requests.post(pubURL, headers=apiHeader)
         c += 1
