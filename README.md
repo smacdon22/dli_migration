@@ -1,5 +1,7 @@
 # dli_migration
-Python import of DLI Training to DLI-IDD dataverse. As part of DLI presentation at IASSIST 2022 in Gothenburg, Sweden on June 8th, 2022 https://iassist2022.org/ https://dli-training.github.io/dli-tr/
+Python import of DLI Training to DLI-IDD dataverse. As part of DLI presentation at IASSIST 2022 in Gothenburg, Sweden on June 8th, 2022 
+Conference website: https://iassist2022.org/ 
+Presentation information: https://dli-training.github.io/dli-tr/
 
 Takes CSV input, reformats into dataverse's JSON format and uploads datasets as drafts. Then uploads files to each dataset, updates their metadata, and publishes everything once uploaded as draft.
 
