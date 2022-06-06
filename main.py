@@ -5,15 +5,26 @@ import os
 import requests
 from sword2 import Connection
 
+# change this to file name
+# of all records
+file-name = "ingest-test.csv"
 # change this to your API token
 apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
 con = Connection("https://demodv.scholarsportal.info/dvn/api/", user_name=apitoken)
+# here are URLs to use later
+# add dataset
 requestURL = "https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/datasets"
+# add file
 fileURL = "https://demodv.scholarsportal.info/dvn/api/data-deposit/v1.1/swordv2/edit-media/study/"
-# list of persistentIds to publish datasets after uploading
-PIDs = []
+# get file metadata (want new id)
+mdURL = "https://demodv.scholarsportal.info/api/datasets/" 
+# add file metadata
+nURL = "https://demodv.scholarsportal.info/api/files/"
+# publish record
+pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="
 
+# to format JSON booleans correctly?
 false = bool(0)
 true = bool(1)
 
@@ -182,7 +193,7 @@ def getMimeType(p):
     else:
         return "text/plain"
 
-
+# this returns the file name, and file metadata
 def getFile(p):
     fName = p[29]
     fInfo = {"filename": p[29], "description": p[1]+" "+(p[28].upper()), "categories": [p[2]], "restrict": false,
@@ -193,7 +204,7 @@ def getFile(p):
 # main
 if __name__ == '__main__':
     # open and read test .csv
-    with open("ingest-test.csv", "r") as dli_info:
+    with open(file-name, "r") as dli_info:
         reader = csv.reader(dli_info)
         # this is the already seen IDs
         # there may be multiple datasets with the same ID
@@ -209,8 +220,7 @@ if __name__ == '__main__':
             dataset_id = file_line[31][23:27]
             if file_line[0] == "UID":
                 pass
-            # would normally add file info here
-            # but not needed for just metadata upload
+            # add file to existing record
             elif prev_ids.count(dataset_id) > 0:
                 d = prev_ids.index(file_line[31][23:27])
                 datasets_metadata[d][1].append(getFile(file_line))
@@ -242,7 +252,7 @@ if __name__ == '__main__':
                 blank_json["datasetVersion"]["metadataBlocks"]["citation"]["fields"] = [title_md, date_md, desc_md,
                                                                                         subject_md, author_md, language_md,
                                                                                         contact_md, keyword_md, series_md]
-                # add to list of all metadata
+                # add record metadata and file info (name and metadata) to list of all metadata
                 datasets_metadata.append([blank_json, [fs]])
 
                 c += 1
@@ -255,6 +265,9 @@ if __name__ == '__main__':
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
         ppp = response.json()["data"]["persistentId"]
         for i in r[1]:
+            # store files in "files" folder, with old cudo id folder
+            # ex: *this directory*/files/2338/ecosoc.pdf
+            # all files for record will be in the old id folder
             with open(os.getcwd() + "/files/" + prev_ids[c] + "/" + i[0], "rb") as data:
                 receipt = con.add_file_to_resource(
                     edit_media_iri= fileURL + ppp,
@@ -262,18 +275,16 @@ if __name__ == '__main__':
                     mimetype="application/zip",
                     filename=i[0],
                     packaging="http://purl.org/net/sword/package/SimpleZip")
-        mdURL = "https://demodv.scholarsportal.info/api/datasets/" + str(response.json()["data"]["id"]) + "/versions/:draft/files"
-        res = requests.get(mdURL, headers=apiHeader)
+        # get newly uploaded files' id to edit metadata
+        res = requests.get(str(mdURL + str(response.json()["data"]["id"]) + "/versions/:draft/files"), headers=apiHeader)
         if res.json()["status"] != "ERROR":
             m = 0
             for v in res.json()["data"]:
-                nURL = "https://demodv.scholarsportal.info/api/files/" + str(v["dataFile"]["id"]) + "/metadata"
                 files = {'jsonData': (None, str(json.dumps(r[1][m][1]))),}
-                rres = requests.post(nURL, headers=apiHeader, files=files)
+                # update metadata with info added earlier
+                # (new description, category, and maybe sub directory)
+                rres = requests.post(str(nURL + str(v["dataFile"]["id"]) + "/metadata"), headers=apiHeader, files=files)
                 m += 1
-                print(files)
-                print(rres.text)
         # publish the dataset
-        pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="+ppp+"&type=major"
-        pResponse = requests.post(pubURL, headers=apiHeader)
+        pResponse = requests.post(str(pubURL+ppp+"&type=major"), headers=apiHeader)
         c += 1
