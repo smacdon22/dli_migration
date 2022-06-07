@@ -7,7 +7,7 @@ from sword2 import Connection
 
 # change this to file name
 # of all records
-file-name = "ingest-test.csv"
+file_name = "ingest-test.csv"
 # change this to your API token
 apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
@@ -204,7 +204,7 @@ def getFile(p):
 # main
 if __name__ == '__main__':
     # open and read test .csv
-    with open(file-name, "r") as dli_info:
+    with open(file_name, "r") as dli_info:
         reader = csv.reader(dli_info)
         # this is the already seen IDs
         # there may be multiple datasets with the same ID
