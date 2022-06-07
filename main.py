@@ -7,21 +7,23 @@ from sword2 import Connection
 # change this to file name
 # of all records
 file_name = "ingest-test.csv"
+# change this to server host
+serverHost = "https://demodv.scholarsportal.info"
 # change this to your API token
 apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
-con = Connection("https://demodv.scholarsportal.info/dvn/api/", user_name=apitoken)
+con = Connection(str(serverHost + "/dvn/api/"), user_name=apitoken)
 # here are URLs to use later
 # add dataset
-requestURL = "https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/datasets"
+requestURL = serverHost + "/api/dataverses/DLI-IDD/datasets"
 # add file
-fileURL = "https://demodv.scholarsportal.info/dvn/api/data-deposit/v1.1/swordv2/edit-media/study/"
+fileURL = serverHost + "/dvn/api/data-deposit/v1.1/swordv2/edit-media/study/"
 # get file metadata (want new id)
-mdURL = "https://demodv.scholarsportal.info/api/datasets/" 
+mdURL = serverHost + "/api/datasets/"
 # add file metadata
-nURL = "https://demodv.scholarsportal.info/api/files/"
+nURL = serverHost + "/api/files/"
 # publish record
-pubURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/actions/:publish?persistentId="
+pubURL = serverHost + "/api/datasets/:persistentId/actions/:publish?persistentId="
 
 # to format JSON booleans correctly?
 false = bool(0)
@@ -256,12 +258,12 @@ if __name__ == '__main__':
 
                 c += 1
     # for each metadata string (in json format)
-    c = 0
     for r in datasets_metadata:
         json.dumps(r[0])
         apiJSON = r[0]
         # upload dataset as draft
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
+        print(response.json())
         ppp = response.json()["data"]["persistentId"]
         for i in r[1]:
             # store files in "files" folder, with old cudo id folder
@@ -269,7 +271,7 @@ if __name__ == '__main__':
             # all files for record will be in the old id folder
             with open(os.getcwd() + "/files/" + prev_ids[c] + "/" + i[0], "rb") as data:
                 receipt = con.add_file_to_resource(
-                    edit_media_iri= fileURL + ppp,
+                    edit_media_iri=fileURL + ppp,
                     payload=data,
                     mimetype="application/zip",
                     filename=i[0],
@@ -286,4 +288,3 @@ if __name__ == '__main__':
                 m += 1
         # publish the dataset
         pResponse = requests.post(str(pubURL+ppp+"&type=major"), headers=apiHeader)
-        c += 1
