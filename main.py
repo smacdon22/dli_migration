@@ -37,7 +37,8 @@ def getTDDLKSS(p):
     title_metadata = {"typeName": "title", "multiple": false,
                       "value": p[1].replace("\xa0", " "), "typeClass": "primitive"}
     # date
-    publication_date_metadata = {"typeName": "publicationDate", "multiple": false, "value": p[13].replace("\xa0", " "),
+    publication_date_metadata = {"typeName": "productionDate", "multiple": false,
+                                 "value": str(p[13]),
                                  "typeClass": "primitive"}
     # description
     description_metadata = {"typeName": "dsDescription", "multiple": true,
@@ -194,6 +195,7 @@ def getMimeType(p):
     else:
         return "text/plain"
 
+
 # this returns the file name, and file metadata
 def getFile(p):
     fName = p[29]
@@ -257,6 +259,7 @@ if __name__ == '__main__':
                 datasets_metadata.append([blank_json, [fs]])
 
                 c += 1
+    c = 0
     # for each metadata string (in json format)
     for r in datasets_metadata:
         json.dumps(r[0])
@@ -288,3 +291,4 @@ if __name__ == '__main__':
                 m += 1
         # publish the dataset
         pResponse = requests.post(str(pubURL+ppp+"&type=major"), headers=apiHeader)
+        c += 1
