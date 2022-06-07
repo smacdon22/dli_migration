@@ -1,6 +1,5 @@
 import json
 import csv
-import wget
 import os
 import requests
 from sword2 import Connection
