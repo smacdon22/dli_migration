@@ -292,3 +292,8 @@ if __name__ == '__main__':
         # publish the dataset
         pResponse = requests.post(str(pubURL+ppp+"&type=major"), headers=apiHeader)
         c += 1
+    response = requests.get("https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/contents", headers=apiHeader)
+    for i in response.json()["data"]:
+        updateURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/citationdate?persistentId=" + str(
+            "doi:10.80240/" + i["identifier"])
+        res = requests.put(updateURL, headers=apiHeader, data="productionDate")
