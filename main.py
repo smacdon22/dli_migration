@@ -1,21 +1,25 @@
 import json
 import csv
 import os
+import datetime
 import requests
 from sword2 import Connection
+import mysql.connector
 
 # change this to file name
 # of all records
 file_name = "ingest-test.csv"
 # change this to server host
-serverHost = "https://demodv.scholarsportal.info"
+serverHost = "https://demodv.borealis.info"
+# change this to dataverse ID
+dvID = "DLI-IDD"
 # change this to your API token
 apitoken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 apiHeader = {"X-Dataverse-key": apitoken}
 con = Connection(str(serverHost + "/dvn/api/"), user_name=apitoken)
 # here are URLs to use later
 # add dataset
-requestURL = serverHost + "/api/dataverses/DLI-IDD/datasets"
+requestURL = serverHost + "/api/dataverses/"+ dvID +"/datasets"
 # add file
 fileURL = serverHost + "/dvn/api/data-deposit/v1.1/swordv2/edit-media/study/"
 # get file metadata (want new id)
@@ -24,6 +28,8 @@ mdURL = serverHost + "/api/datasets/"
 nURL = serverHost + "/api/files/"
 # publish record
 pubURL = serverHost + "/api/datasets/:persistentId/actions/:publish?persistentId="
+# change citation date type
+citURL = serverHost + "/api/datasets/:persistentId/citationdate?persistentId="
 
 # to format JSON booleans correctly?
 false = bool(0)
@@ -120,7 +126,7 @@ def getAuthor(p):
 
 
 # returns contact info
-# could be authors, or DLI
+# change to repository owner info
 def getContact():
     contact_metadata = {
         "value": [
@@ -143,16 +149,21 @@ def getContact():
 
 
 # gets copyright license
+# special case for statscan license, change
 def getLicense(p):
     # checks if Statistics Canada content or not
     if p[5].replace("\xa0", " ") == "Statistics Canada" or p[4].replace("\xa0", " ") == "Statistics Canada":
         # either their open license
         license_metadata = {"name": "Statistics Candada Open License",
-                            "uri": "https://www.statcan.gc.ca/en/reference/licence"}
+                            "uri": "https://www.statcan.gc.ca/en/reference/licence", "active": true,
+                            "shortDescription": "This work is licensed under the Statistics Canada Open License.",
+                            "iconURL": "https://i.imgur.com/kikchVK.jpg"}
     else:
         # or CC BY 4.0
         license_metadata = {"name": "CC BY 4.0", "uri": "http://creativecommons.org/licenses/by/4.0",
-                            "iconURL": "https://licensebuttons.net/l/by/4.0/88x31.png"}
+                            "iconURL": "https://licensebuttons.net/l/by/4.0/88x31.png", "shortDescription":
+                                "This work is licensed under a Creative Commons Attribution 4.0 International License.",
+                            "active": true}
     return license_metadata
 
 
@@ -207,6 +218,7 @@ def getFile(p):
 # main
 if __name__ == '__main__':
     # open and read test .csv
+    print("uploading datasets...")
     with open(file_name, "r") as dli_info:
         reader = csv.reader(dli_info)
         # this is the already seen IDs
@@ -259,6 +271,8 @@ if __name__ == '__main__':
                 datasets_metadata.append([blank_json, [fs]])
 
                 c += 1
+    print("datasets uploaded")
+    print("uploading files...")
     c = 0
     # for each metadata string (in json format)
     for r in datasets_metadata:
@@ -266,7 +280,6 @@ if __name__ == '__main__':
         apiJSON = r[0]
         # upload dataset as draft
         response = requests.post(requestURL, headers=apiHeader, json=apiJSON)
-        print(response.json())
         ppp = response.json()["data"]["persistentId"]
         for i in r[1]:
             # store files in "files" folder, with old cudo id folder
@@ -289,11 +302,11 @@ if __name__ == '__main__':
                 # (new description, category, and maybe sub directory)
                 rres = requests.post(str(nURL + str(v["dataFile"]["id"]) + "/metadata"), headers=apiHeader, files=files)
                 m += 1
+        # change citation date type
+        cResponse = requests.put(str(citURL + ppp), headers=apiHeader, data="productionDate")
         # publish the dataset
         pResponse = requests.post(str(pubURL+ppp+"&type=major"), headers=apiHeader)
         c += 1
-    response = requests.get("https://demodv.scholarsportal.info/api/dataverses/DLI-IDD/contents", headers=apiHeader)
-    for i in response.json()["data"]:
-        updateURL = "https://demodv.scholarsportal.info/api/datasets/:persistentId/citationdate?persistentId=" + str(
-            "doi:10.80240/" + i["identifier"])
-        res = requests.put(updateURL, headers=apiHeader, data="productionDate")
+    print("files uploaded")
+    print("datasets published")
+    print("done")
