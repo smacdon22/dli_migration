@@ -154,7 +154,7 @@ def getLicense(p):
     # checks if Statistics Canada content or not
     if p[5].replace("\xa0", " ") == "Statistics Canada" or p[4].replace("\xa0", " ") == "Statistics Canada":
         # either their open license
-        license_metadata = {"name": "Statistics Candada Open License",
+        license_metadata = {"name": "Statistics Canada Open License",
                             "uri": "https://www.statcan.gc.ca/en/reference/licence", "active": true,
                             "shortDescription": "This work is licensed under the Statistics Canada Open License.",
                             "iconURL": "https://i.imgur.com/kikchVK.jpg"}
